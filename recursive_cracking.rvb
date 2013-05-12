@@ -1,0 +1,192 @@
+﻿Option Explicit
+'      ___           ___           ___           ___           ___     
+'     /\  \         /\  \         /\  \         /\  \         /\__\     '
+'    /::\  \       /::\  \       /::\  \       /::\  \       /:/  /     '
+'	/:/\:\  \     /:/\:\  \     /:/\:\  \     /:/\:\  \     /:/__/      '
+'  /:/  \:\  \   /::\~\:\  \   /::\~\:\  \   /:/  \:\  \   /::\__\____  '
+' /:/__/ \:\__\ /:/\:\ \:\__\ /:/\:\ \:\__\ /:/__/ \:\__\ /:/\:::::\__\ '
+' \:\  \  \/__/ \/_|::\/:/  / \/__\:\/:/  / \:\  \  \/__/ \/_|:|~~|~    '
+'  \:\  \          |:|::/  /       \::/  /   \:\  \          |:|  |     '
+'   \:\  \         |:|\/__/        /:/  /     \:\  \         |:|  |     '
+'    \:\__\        |:|  |         /:/  /       \:\__\        |:|  |     '
+'	  \/__/         \|__|         \/__/         \/__/         \|__|     '
+'																	    '
+' MODIFIED TRIANGULATION SCRIPT BY ROBIN WILLIS						    '
+'(gotta get your ASCII on)												'
+
+Call Main()
+
+Sub Main()
+
+	'variable to make sure we select surfaces (note constant variables are usually dumb espe when they are used once in a script)
+	Const rhObjectSurface = 8
+	'Declare Variables
+	Dim arrObject, strsurface, Udomain, Vdomain, Uparam , Vparam, arrpoint, strsurfacex
+	Dim	i , j, secu , secv, vrnd, urnd, counter
+
+	counter = 0
+	secu = 8
+	secv = 4
+ 	
+	ReDim collec(secu,secv), arrCrack(counter)
+ 	
+	'prompt user to select surfaces for our script and put them in an array
+	arrObject = Rhino.GetObjects ("select some surfaces mofo",rhObjectSurface)
+	If IsNull (strsurface) Then Exit Sub 'In Case i want To escape script
+	'catch the surface the min And the max In both directions u,v
+	
+	'loop through the array of surfaces
+	For Each strsurface In arrObject
+		strsurfacex = strsurface
+		Udomain = Rhino.SurfaceDomain(strsurface,0)
+		Vdomain = Rhino.SurfaceDomain(strsurface,1)
+		'looping
+	
+		For  i = 0 To secu
+			For j = 0 To secv
+				Uparam =  Udomain(0) + i *((Udomain(1) - Udomain(0))/secu)
+			
+				Vparam =  Vdomain(0) + j *((Vdomain(1) - Vdomain(0)-2)/secv)
+				'Rhino.Print Vparam
+
+				'urnd = Rand(1.75,-1.75)
+				Uparam = Uparam 
+				
+				'vrnd = Rand(1.75,-1.75)
+				Vparam = Vparam+1
+			
+				'here we "Fix" the point On the curve
+				arrpoint = Rhino.EvaluateSurface(strsurface, Array(Uparam, Vparam))
+				Rhino.AddPoint arrpoint
+				'here we charge the 2dimention Array With the size In i And j
+				collec(i,j)=arrpoint
+			Next 
+		Next
+		
+ 'here we assign a name For my points inside the Array
+ Dim newpoint,newpoint2, newpoint3, np1
+ 'here we assign the position of the points inside of the Array
+
+		For i = 0 To secu -1
+  For j = 0 To secv -1
+   newpoint = collec (i,j)
+   newpoint2 = collec (i+1, j+1)
+   newpoint3 = collec ( i+1,j)
+   np1 = collec (i,j+1)
+   
+				'here Call Function to triangulate our surface and hold the created objects in an array
+				'note the array needs its own counter because there are two kinds of objects being created and we want them all
+				ReDim Preserve arrCrack(counter)
+				arrCrack(counter) = mifunction (newpoint, newpoint2, newpoint3)
+				counter = counter +1
+								
+				ReDim Preserve arrCrack(counter)
+				arrCrack(counter) = mifunction (newpoint, np1, newpoint2)
+				counter = counter +1
+				
+
+		
+			Next
+		Next
+		Call RecursiveCrack (arrCrack, strsurfacex, 3, 0)
+	counter = 0
+	Next
+	'after all is said and done call our recursion function using the array with all of the objects we just created
+	
+End Sub
+
+Sub RecursiveCrack(arrObject, strsurfacex, generations, change)
+
+	Dim strObject, points, i, j, centroid, arrCentroid, strDivision, ShapeCount, strShapes, newshape, strCenter, strSurface
+	Dim arrData, arrParam
+	ReDim arrCrackShape(0) 
+
+	'strSurface = Rhino.GetObject("Select surface that pulls", 8)
+	'loop through all of the objects in array (note change doesnt work it just equals 0
+	For i = change To ubound(arrObject)
+		'get the points of our object
+		points = Rhino.CurvePoints (arrObject(i))
+		'call function that calculates the centroid of our object
+	
+	
+	
+		centroid = PullPoints (arrObject(i),strSurfacex)
+		
+		
+		shapeCount = 0
+		'loop through points of our object
+		For j = 0 To ubound(points)-1
+			
+			'if this is the last point then close the new object with the first coord
+			If j = ubound(points)-1 Then
+				strDivision = array(points(j), points(0),centroid(0), points(j))
+				'note we are using polylines so the script does not crash my rhino stops, they are all closed triangles so guess what they can all be converted to planar surfaces
+				newshape =	Rhino.AddPolyline (strDivision)
+				
+	
+				
+				'if it is not the last point create object normally
+			Else	
+				strDivision = array(points(j), points(j+1), centroid(0), points(j))
+				newshape = Rhino.AddPolyLine (strDivision)
+			
+
+			
+			End If
+		
+			'build array of our newly created objects
+			ReDim Preserve arrCrackShape(shapeCount)
+			arrCrackShape(shapeCount)=	newshape
+	
+			shapeCount=shapeCount+1
+		
+
+		Next
+	
+		'arrParam = Rhino.SurfaceClosestPoint(strSurfacex, centroid(0))
+		'arrData = Rhino.SurfaceCurvature(strSurfacex, arrParam)
+		If generations > 0 Then
+			
+		
+				'Provided the timer has not ran out recall the function using the array of objects we just generated
+			Call RecursiveCrack(arrCrackShape, strsurfacex, generations-1, change, view)
+			
+			End If
+	Next
+	
+End Sub
+
+Function mifunction (newpoint, newpoint2, newpoint3)
+	mifunction = Rhino.addPolyline (Array (newpoint, newpoint2, newpoint3, newpoint) )
+	'Call Rhino.addSrfPt (Array (newpoint, newpoint2, newpoint3, newpoint) )
+End Function
+Function mifunction (newpoint, np1, newpoint2)
+	mifunction = Rhino.addPolyline (Array (newpoint, np1, newpoint2, newpoint) )
+	'Call Rhino.addSrfPt(Array (newpoint, np1, newpoint2, newpoint) )
+End Function
+Function Rand(upperbound, lowerbound)
+	
+	Call Randomize()
+	Rand = ((upperbound - lowerbound + 1) * Rnd() + lowerbound)
+	
+End Function
+Function calcCentroid(strObject)
+	Dim center, surfacecenter
+	center = Rhino.CurveAreaCentroid (strObject)
+	calcCentroid =center(0)
+End Function
+Function PullPoints(strObject,StrSurface)
+
+	Dim ArrPt, centerpt, arrResults, testpt
+	ReDim arrPoints( 0 )		
+	
+	centerpt = Rhino.addpoint(calcCentroid(strObject))
+
+	arrPoints(0) = Rhino.PointCoordinates( centerpt)
+	arrResults = Rhino.PullPoints( strSurface, arrPoints )
+	PullPoints = arrResults 
+	'Rhino.AddPoint (arrResults)
+	Rhino.DeleteObject (centerpt)
+
+
+End Function

@@ -1,0 +1,47 @@
+﻿Option Explicit
+'Script written by <Robin Willis>
+'Script version Tuesday, May 13, 2008 6:33:36 PM
+
+Call Main()
+Sub Main()
+
+	Dim folder, view
+	viewIndex = 0
+	folder = Rhino.BrowseForFolder(Rhino.DocumentPath, "Browse for folder", "Batch Render")
+	If IsNull(folder) Then Exit Sub
+
+	Dim strView, i
+
+	For i=0 To 180
+		'get the current view
+		strView = Rhino.CurrentView
+		'rotate that view
+		Rhino.RotateView strView, 0, 2
+		'render the view
+		RenderView folder, viewIndex
+		'push the index up
+		viewIndex = viewIndex + 1
+	Next
+End Sub
+
+Sub RenderView(folder, viewIndex)
+	
+	'execute render command
+	Rhino.Command "_-Render"
+	' Save the render to a jpg file
+	Rhino.Command "_-SaveRenderWindowAs " & GetRenderFileName(folder, viewIndex, "jpg")
+	' Close the render window
+	'Counter = Counter + 1
+	Rhino.Command "_-CloseRenderWindow"    
+End Sub
+
+
+Function GetRenderFileName(folder, viewIndex, ext)
+	Dim doc, file, temp, counter
+	'get Document name
+	doc = Rhino.DocumentName
+	'build image name string
+	temp = "_" & viewIndex & "." & ext
+	file = LCase(Replace(doc, ".3dm", temp, 1, -1, 1))
+	GetRenderFileName = Chr(34) & folder & file & Chr(34)
+End Function

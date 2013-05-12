@@ -1,0 +1,166 @@
+﻿Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Wednesday, 02 December 2009 18:09:01
+
+Call Main()
+Sub Main()
+	'Dim arrCrv: arrCrv=Rhino.GetObjects("select data curves", 4)
+	'Dim strSrf, strSrf0: strSrf0 = Rhino.AddLoftSrf(ArrCrv)
+	'Dim strSrf
+	Dim strSrf: strSrf = Rhino.GetObject("Select a surface")
+	Dim intUInt: intUInt = Rhino.GetInteger("number of U intervals?", 10, 5)
+	Dim intVInt: intVInt = Rhino.GetInteger("number of V intervals?", 10, 5)
+	Dim IntNPts: intNPts = Rhino.GetInteger("how many samples for the curves?", 100, 50, 200)
+	If isNull (intNpts) Then Exit Sub
+	
+	'strSrf=strSrf0(0)
+	
+	Dim arrUdom, arrVdom, arrpanel
+	
+	ArrUdom = Rhino.SurfaceDomain(strSrf, 0)
+	ArrVdom = Rhino.SurfaceDomain(strSrf, 1)
+	
+	Call Rhino.Print("surface U domain: from " & arrUdom(0) & " to " & arrUdom(1))
+	Call Rhino.Print("surface V domain: from " & arrVdom(0) & " to " & arrVdom(1))
+	
+	Dim i, j, arrPt, Upar, Vpar, strFrame, dblUdist, dblVdist
+	
+	ReDim arrPt(intUint-1, intVint-1)
+	
+	Call Rhino.EnableRedraw(False)
+	
+	For i=0 To IntUInt-1
+		For j=0 To intVInt-1
+			Upar= arrUdom(0)+i*(arrUdom(1)-arrUdom(0))/(intUInt-1)
+			Vpar= arrVdom(0)+j*(arrVdom(1)-arrVdom(0))/(intVInt-1)
+			'evaluating surface at (upar, vpar), it gives a 3d point
+			arrPt(i,j)=Rhino.EvaluateSurface(strSrf, array(upar, vpar))
+			'place a point there; describing a surface with loads of points
+			Call Rhino.addpoint(arrPt(i, j))
+		Next
+	Next
+	
+	Dim ArrPtCurves(), arrPtCurvesC(), ArrCurves1()
+	ReDim ArrCurves1(intUInt-1)
+	Dim p, n
+
+	For p=0 To IntUInt-1
+		n=0
+		ReDim ArrPtCurves(p,n)
+	
+		For i=0 To IntUInt-1
+			For j=0 To intVInt-1
+				If i= (j+p) Then
+					ReDim Preserve ArrPtCurves (p,n)
+					ReDim Preserve ArrPtCurvesC (n)
+					ArrPtCurves (p,n) = ArrPt(i,j)
+					ArrPtCurvesC(n)= arrPtCurves(p,n)
+					n=n+1
+				End If
+			Next
+		Next
+		ArrCurves1(p) = Rhino.AddCurve(arrPtCurvesC)
+		If n>2 Then
+			
+			Dim dblRadius, q, ArrCirc, ArrPts
+			Dim arrDom: arrDom = Rhino.CurveDomain(arrCurves1(p))
+			Dim dblparam, arrCrvData, dblStep, arrPlane
+			ReDim arrCirc(intNpts)
+			
+			dblStep = (arrDom(1)-arrDom(0))/(intNPts+1)
+			
+			For q=0 To intNPts
+				dblParam = arrDom(0) + q*dblStep
+				arrCrvData = Rhino.CurveCurvature (arrCurves1(p), dblParam)
+				arrPlane = Rhino.CurvePerpFrame(arrCurves1(p), dblParam)
+			
+				If Not isNull (arrCrvData) Then
+					dblRadius= 5/arrCrvData(3)
+				Else
+					dblRadius = 1
+				End If
+				arrCirc(q) = Rhino.AddCircle(arrPlane, dblRadius)
+			Next
+			Call Rhino.AddLoftSrf(arrCirc)
+		End If
+	Next
+	
+	Dim ArrCurves2()
+	ReDim ArrCurves2(intUInt-1)
+	For p=0 To IntUInt-1
+		n=0
+		ReDim ArrPtCurves(p,n)
+		For i=1 To IntUInt-1
+			For j=0 To intVInt-1
+				If (i+p)=j Then
+					ReDim Preserve ArrPtCurves(p,n)
+					ReDim Preserve ArrPtCurvesC (n)
+					ArrPtCurves (p,n) = ArrPt(i,j)
+					ArrPtCurvesC(n)= arrPtCurves(p,n)
+					n=n+1
+				End If
+			Next
+		Next
+		
+	
+		
+		ArrCurves2(p) = Rhino.AddCurve(arrPtCurvesC)
+		If n>2 Then
+			arrDom = Rhino.CurveDomain(arrCurves2(p))
+			ReDim arrCirc(intNpts)
+			dblStep = (arrDom(1)-arrDom(0))/(intNPts+1)
+			For q=0 To intNPts
+				dblParam = arrDom(0) + q*dblStep
+				arrCrvData = Rhino.CurveCurvature (arrCurves2(p), dblParam)
+				arrPlane = Rhino.CurvePerpFrame(arrCurves2(p), dblParam)
+				If Not isNull (arrCrvData) Then
+					dblRadius= 5/arrCrvData(3)
+				Else
+					dblRadius = 1
+				End If
+				arrCirc(q) = Rhino.AddCircle(arrPlane, dblRadius)
+			Next
+			Call Rhino.AddLoftSrf(arrCirc)
+		End If
+	Next
+
+	
+	Dim ArrCurves3()
+	ReDim ArrCurves3(2*(intUInt-1))
+	For p=0 To 2*(IntUInt-1)
+		n=0
+		ReDim ArrPtCurves(p,n)
+		For i=0 To IntUInt-1
+			For j=0 To intVInt-1
+				If i+j=p Then
+					ReDim Preserve ArrPtCurves (p,n)
+					ReDim Preserve ArrPtCurvesC (n)
+					ArrPtCurves (p,n) = ArrPt(i,j)
+					ArrPtCurvesC(n)= arrPtCurves(p,n)
+					n=n+1
+				End If
+			Next
+		Next
+		ArrCurves3(p) = Rhino.AddCurve(arrPtCurvesC)
+		If n>2 Then
+			arrDom = Rhino.CurveDomain(arrCurves3(p))
+			ReDim arrCirc(intNpts)
+			dblStep = (arrDom(1)-arrDom(0))/(intNPts+1)
+			For q=0 To intNPts
+				dblParam = arrDom(0) + q*dblStep
+				arrCrvData = Rhino.CurveCurvature (arrCurves3(p), dblParam)
+				arrPlane = Rhino.CurvePerpFrame(arrCurves3(p), dblParam)
+				If Not isNull (arrCrvData) Then
+					dblRadius= 15/arrCrvData(3)
+				Else
+					dblRadius = 1
+				End If
+				arrCirc(q) = Rhino.AddCircle(arrPlane, dblRadius)
+			Next
+			Call Rhino.AddLoftSrf(arrCirc)
+		End If
+		
+	Next
+	Call Rhino.EnableRedraw(True)
+End Sub

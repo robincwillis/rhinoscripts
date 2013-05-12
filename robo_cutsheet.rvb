@@ -1,0 +1,167 @@
+﻿Option Explicit
+'Script written by <insert name>
+'Script copyrighted by <insert company name>
+'Script version Wednesday, September 16, 2009 9:15:24 AM
+
+Call killThickness()
+
+Sub killThickness()
+	'thickness of material (provide some tolerance)
+	Dim thickness
+	Dim defThickness : defThickness = 0.15
+	Const rhObjectPolySurface = 16
+	Dim strObject, arrObjects
+	Dim strSurface, arrSurface
+
+	arrObjects = Rhino.GetObjects("Select polysurfaces for Cutsheet", rhObjectPolySurface)
+	thickness = Rhino.GetReal("Material Thickness", defThickness)
+	
+	'Call Rhino.EnableRedraw(False)
+	
+	For Each strObject In arrObjects
+	
+		If Rhino.IsPolysurface(strObject) Then
+			arrSurface = Rhino.ExplodePolysurfaces(strObject)
+			Rhino.DeleteObject strObject
+		End If
+		
+		Dim arrEdge, strEdge, dblLength
+		
+	For Each strSurface In arrSurface
+
+		arrEdge = Rhino.DuplicateEdgeCurves(strSurface)
+
+			If UBound(arrEdge) < 4 Then
+		
+				For Each strEdge In arrEdge
+
+				dblLength = Rhino.CurveLength(strEdge)
+				
+					
+					If dblLength <= thickness Then
+					Rhino.DeleteObject strSurface
+					End If
+
+				Next
+				
+			End If
+			Rhino.DeleteObjects arrEdge
+	Next
+
+		Dim arrFaces
+		Rhino.SelectObjects(arrSurface)
+		arrFaces = Rhino.SelectedObjects
+		Rhino.DeleteObject arrFaces(1)
+
+	Next
+
+	Dim arrStrip 
+	Rhino.SelectObjects(arrObjects)	
+	arrStrip = Rhino.SelectedObjects
+		
+	Call unRollSurface(arrStrip)
+	Call Rhino.EnableRedraw(True)
+End Sub
+
+Sub unRollSurface(arrObject)
+	
+	'offset text from cutsheet object
+	Dim textOffset : textOffset = 0.25
+	Dim te : te = Rhino.GetString("create Cutsheet Name")
+	Dim labelLayer : labelLayer = Rhino.AddLayer (te & "_labels", RGB(0, 255, 0))
+	Dim cutsheetLayer : cutsheetLayer = Rhino.AddLayer (te & "_cutsheet", RGB(255, 0, 0))
+	Dim arrUnroll : arrUnroll = Array()
+	Dim k : k = -1
+	Dim strObject
+	'Call Rhino.EnableRedraw(False)
+	Dim dotPoint
+	Dim	arrParam(1)
+	Dim arrDomainU
+	Dim arrDomainV
+	'arrParam(0) = 0
+	'arrParam(1) = 0
+
+	
+	
+	
+	For Each strObject In arrObject
+	
+		Call Rhino.UnselectAllObjects
+		Call Rhino.SelectObject(strObject)
+		
+		arrDomainU = Rhino.SurfaceDomain(strObject, 0)
+
+		arrDomainV = Rhino.SurfaceDomain(strObject, 1)
+
+		arrParam(0) = arrDomainU(1)
+
+		arrParam(1) = arrDomainV(1)
+
+
+		
+		Rhino.CurrentLayer(labelLayer)	
+		dotPoint = Rhino.EvaluateSurface (strObject, arrParam)
+		Rhino.AddTextDot te & "_" & k+1, dotPoint
+		Rhino.CurrentLayer(cutsheetLayer)
+		
+		Call Rhino.Command (CStr("_UnrollSrf Explode=No Labels=No _Enter"), vbFalse)
+	
+
+		k = k + 1
+		redim preserve arrUnroll(k) 
+		arrUnroll(k) = Rhino.FirstObject
+		
+	Next
+	
+	Dim strUnroll
+		
+	Dim  gr, bb, bbdim : bbdim = 0
+	Dim offset : offset = 1
+	Dim g
+	k = 0
+
+	For Each strUnroll In arrUnroll
+		g = k-1
+		If k > 0 Then
+			bb = Rhino.BoundingBox(arrUnroll(k-1))
+			bbdim = bbdim + Rhino.Distance(bb(0), bb(1))+offset
+		Else
+			bbdim = 0
+		End If
+		
+		Call rhino.MoveObject(strUnroll, array(0,0,0), array(0+bbdim,0,0))
+		Rhino.CurrentLayer(labelLayer)
+
+		Call txtLabels(k,array(bbdim + textOffset,textOffset,0),te)
+		Rhino.CurrentLayer(cutsheetLayer)
+		
+		Dim ared : ared = rhino.DuplicateEdgeCurves(strUnroll)
+		
+		Dim join : join = Rhino.JoinCurves(ared, True)
+		
+		k = k + 1
+	Next
+	Call Rhino.DeleteObjects(arrUnroll)
+	
+	Call rhino.EnableRedraw(True)
+
+	
+End Sub
+
+Sub  txtLabels(Index, Insert, id)
+	'text size
+	Dim lineHeight : lineHeight = 0.25 	
+	Dim strMacro 
+	strMacro = "-_TextObject Output=Curves "
+	strMacro = strMacro & "AllowOpenCurves=No " & "Height=" & CStr(lineHeight) & " "
+	strMacro = strMacro & id & "_" & CStr(Index) & " "	
+	
+	Dim strPoint
+
+	strPoint = Rhino.Pt2Str(Insert)
+	'strPoint = Rhino.Pt2Str(array(0,0,0))
+	strMacro = strMacro & strPoint & " "
+		
+	Call Rhino.Command (strMacro)
+	
+End Sub

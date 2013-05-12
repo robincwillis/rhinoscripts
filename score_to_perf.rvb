@@ -1,0 +1,49 @@
+﻿Option Explicit
+'Script written by Robin Willis
+'Script version Thursday, March 11, 2010 4:13:28 PM
+
+Call scoreToPerf()
+Sub scoreToPerf()
+
+	Dim arrObjects, strObject
+	Dim  arrPoints, arrPoint
+	
+	Dim dblDiameter
+	Dim defDiameter : defDiameter = 0.0625
+	Dim minDiameter : minDiameter = 0.01
+	Dim maxDiameter : maxDiameter = 0.125
+	
+	Dim perfSpacing
+	Dim defPerfSpacing : defPerfSpacing = 0.75
+	
+	Dim arrOrigin, arrXaxis, arrYaxis
+	arrXaxis = Array(1,0,0)
+	arrYaxis = Array(0,1,0)
+	
+	arrObjects = Rhino.GetObjects("Pick some curves", 4)
+	dblDiameter = Rhino.GetReal("Diameter of Perforation", defDiameter, minDiameter, MaxDiameter)
+	perfSpacing = Rhino.GetReal("Spacing of Perforation", defPerfSpacing, dblDiameter)
+	
+	Rhino.AddLayer "Cut-Perforations", RGB(255, 0, 255)
+	Rhino.CurrentLayer("Cut-Perforations")
+	
+	Rhino.EnableRedraw(False)
+	
+	If IsArray(arrObjects) Then
+
+		For Each strObject In arrObjects
+			
+			If Rhino.IsCurve(strObject) Then
+
+				arrPoints = Rhino.DivideCurveLength(strObject, perfSpacing+dblDiameter)
+				For Each arrPoint In arrPoints
+					arrOrigin = Rhino.PlaneFromFrame(arrPoint, arrXaxis, arrYaxis)
+					If Not IsNull(dblDiameter) Then
+						Rhino.AddCircle arrOrigin, dblDiameter/2
+					End If
+				Next
+			End If		
+		Next
+	End If	
+	Rhino.EnableRedraw(True)
+End Sub
